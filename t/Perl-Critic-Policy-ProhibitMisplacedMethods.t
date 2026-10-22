@@ -72,7 +72,7 @@ sub found {
 }
 
 sub only_below { return "Sub $_[0] is used only by $_[1], a subclass of $_[2]" }
-sub beside     { return "Sub $_[0] is also defined in $_[1], and $_[2], which they inherit from, does not define it" }
+sub beside     { return "Sub $_[0] is also defined in $_[1], under $_[2], which does not define it" }
 
 # A class in lib/, from its name, its parent and its body.
 sub class_file {
@@ -151,6 +151,9 @@ subtest 'a sub that two subclasses define goes up into the class above them' => 
     is_deeply( found( $root, 'lib/Base/One.pm' ), [ beside(qw{Base::One::release Base::Two Base}) ], 'each definition is reported' );
     is_deeply( found( $root, 'lib/Base/Two.pm' ), [ beside(qw{Base::Two::release Base::One Base}) ], 'and names the other' );
 
+    my $four = dist( class_file( 'Base', undef, 'sub new { 1 }' ), map { class_file( "Base::$_", 'Base', 'sub release { 1 }' ) } qw{One Two Three Four} );
+    is_deeply( found( $four, 'lib/Base/One.pm' ), [ beside( 'Base::One::release', 'Base::Four, Base::Three and Base::Two', 'Base' ) ], 'and lists three others with commas and an and' );
+
     my $cousins = dist(
         class_file( 'Base',         undef,     q{} ),
         class_file( 'Base::A',      'Base',    q{} ),
@@ -164,7 +167,7 @@ subtest 'a sub that two subclasses define goes up into the class above them' => 
         [ beside(qw{Base::A::One::release Base::A::Two Base::A}) ],
         'the nearest class that shares one is named, with the others that share it'
     );
-    is_deeply( found( $cousins, 'lib/Base/B/One.pm' ), [ beside( 'Base::B::One::release', 'Base::A::One, Base::A::Two', 'Base' ) ], 'and a cousin gets the class above both' );
+    is_deeply( found( $cousins, 'lib/Base/B/One.pm' ), [ beside( 'Base::B::One::release', 'Base::A::One and Base::A::Two', 'Base' ) ], 'and a cousin gets the class above both' );
 
     my $override = dist(
         class_file( 'Base',           undef,       'sub new { 1 }' ),

@@ -176,7 +176,7 @@ Readonly::Hash my %EXPL_FOR => (
 
 Readonly::Hash my %DESC_FOR => (
     down => q{Sub %s is used only by %s, a subclass of %s},
-    up   => q{Sub %s is also defined in %s, and %s, which they inherit from, does not define it},
+    up   => q{Sub %s is also defined in %s, under %s, which does not define it},
 );
 
 Readonly::Scalar my $DEFAULT_ALLOW_SUBS => join ' ', Perl::Critic::Distribution->called_by_perl();
@@ -302,7 +302,8 @@ sub violates {
         push @found, $self->violation( sprintf( $DESC_FOR{down}, "${pkg}::$name", $below, $pkg ), $EXPL_FOR{down}, $elem );
     }
     if ( my ( $above, @others ) = defined_beside( $index, $pkg, $name ) ) {
-        push @found, $self->violation( sprintf( $DESC_FOR{up}, "${pkg}::$name", join( ', ', @others ), $above ), $EXPL_FOR{up}, $elem );
+        my $others = @others > 1 ? join( ', ', @others[ 0 .. $#others - 1 ] ) . " and $others[-1]" : $others[0];
+        push @found, $self->violation( sprintf( $DESC_FOR{up}, "${pkg}::$name", $others, $above ), $EXPL_FOR{up}, $elem );
     }
     return @found;
 }

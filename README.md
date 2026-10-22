@@ -206,7 +206,8 @@ my $index = index_of($dist);
 What `collect` found in each file of `bin/` and `lib/` of a
 [Perl::Critic::Distribution](https://metacpan.org/pod/Perl%3A%3ACritic%3A%3ADistribution), put together:
 `{ parents => { $package => [ @parents ] }, defines => { $package => { $sub => 1 } }, users => { $sub => { $package => { $in_sub => 1 } } } }`.
-`$in_sub` is the sub that the use is in, or the empty string.
+`$in_sub` is the qualified name of the sub that the use is in, or the empty
+string.
 
 ### ancestry
 
@@ -259,11 +260,8 @@ my $found = walk($ppi);
 
 What `collect` returns, before it is plain data, and `defs`: each sub
 statement, with its package and its name.  A lexical sub is not a method, and
-is left out.
-
-Each node is read with the package and the sub that it is in.  A package
-statement changes the package of the statements after it in the same block,
-and a package block changes it inside the block.
+is left out.  ["walk" in Perl::Critic::Distribution](https://metacpan.org/pod/Perl%3A%3ACritic%3A%3ADistribution#walk) says which package and which
+sub each element is in.
 
 ### parents\_named
 

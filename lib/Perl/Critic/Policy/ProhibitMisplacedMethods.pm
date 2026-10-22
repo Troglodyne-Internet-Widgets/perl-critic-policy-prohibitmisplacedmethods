@@ -179,13 +179,7 @@ Readonly::Hash my %DESC_FOR => (
     up   => q{Sub %s is also defined in %s, and %s, which they inherit from, does not define it},
 );
 
-Readonly::Scalar my $DEFAULT_ALLOW_SUBS => join ' ', qw{
-  BEGIN END INIT CHECK UNITCHECK AUTOLOAD DESTROY import unimport CLONE CLONE_SKIP
-  BUILD BUILDARGS DEMOLISH FOREIGNBUILDARGS
-  TIESCALAR TIEARRAY TIEHASH TIEHANDLE FETCH STORE FETCHSIZE STORESIZE EXTEND
-  EXISTS DELETE CLEAR PUSH POP SHIFT UNSHIFT SPLICE FIRSTKEY NEXTKEY SCALAR UNTIE
-  PRINT PRINTF WRITE READ READLINE GETC CLOSE OPEN BINMODE EOF FILENO SEEK TELL
-};
+Readonly::Scalar my $DEFAULT_ALLOW_SUBS => join ' ', Perl::Critic::Distribution->called_by_perl();
 
 # The parts of a distribution that are read, and checked.  A subclass or a
 # call in a test is the business of the test.
@@ -261,18 +255,7 @@ sub supported_parameters {
             default_string => $DEFAULT_ALLOW_SUBS,
             behavior       => 'string list',
         },
-        {
-            name           => 'cache',
-            description    => 'Keep what was read of each distribution on disk between runs.',
-            default_string => '1',
-            behavior       => 'boolean',
-        },
-        {
-            name           => 'cache_dir',
-            description    => 'Where it is kept.  Empty means the default of Perl::Critic::Distribution.',
-            default_string => q{},
-            behavior       => 'string',
-        },
+        Perl::Critic::Distribution->policy_parameters(),
     );
 }
 
@@ -349,11 +332,7 @@ sub subs_in {
     my ( undef, $area ) = Perl::Critic::Distribution->root_of($file);
     if ( $area && $CODE_AREA{$area} ) {
 
-        # No cache when cache is off, and the default when cache_dir is empty.
-        my $dist =
-           !$self->{_cache}     ? Perl::Critic::Distribution->for_file( $file, cache_dir => undef )
-          : $self->{_cache_dir} ? Perl::Critic::Distribution->for_file( $file, cache_dir => $self->{_cache_dir} )
-          :                       Perl::Critic::Distribution->for_file($file);
+        my $dist = Perl::Critic::Distribution->for_file( $file, cache => $self->{_cache}, cache_dir => $self->{_cache_dir} );
         if ($dist) {
             my %by_elem = map { Scalar::Util::refaddr( $_->[0] ) => [ @$_[ 1, 2 ] ] } @{ walk( $doc->ppi_document() )->{defs} };
             $subs = { dist => $dist, by_elem => \%by_elem };
@@ -378,7 +357,8 @@ and they are documented for whoever changes the policy.
 What C<collect> found in each file of F<bin/> and F<lib/> of a
 L<Perl::Critic::Distribution>, put together:
 C<< { parents => { $package => [ @parents ] }, defines => { $package => { $sub => 1 } }, users => { $sub => { $package => { $in_sub => 1 } } } } >>.
-C<$in_sub> is the sub that the use is in, or the empty string.
+C<$in_sub> is the qualified name of the sub that the use is in, or the empty
+string.
 
 =cut
 
@@ -453,7 +433,7 @@ sub used_only_below {
     foreach my $user ( keys %$users ) {
 
         # A use inside the sub itself is recursion, and not a user.
-        my @in = grep { $user ne $pkg || $_ ne $name } keys %{ $users->{$user} };
+        my @in = grep { $user ne $pkg || $_ ne "${pkg}::$name" } keys %{ $users->{$user} };
         $user{$user} = 1 if @in;
     }
     $user{$_} = 1 for grep { $_ ne $pkg && $index->{defines}{$_}{$name} } keys %{ $index->{defines} };
@@ -537,11 +517,8 @@ sub collect {
 
 What C<collect> returns, before it is plain data, and C<defs>: each sub
 statement, with its package and its name.  A lexical sub is not a method, and
-is left out.
-
-Each node is read with the package and the sub that it is in.  A package
-statement changes the package of the statements after it in the same block,
-and a package block changes it inside the block.
+is left out.  L<Perl::Critic::Distribution/walk> says which package and which
+sub each element is in.
 
 =cut
 
@@ -549,16 +526,14 @@ sub walk {
     my ($ppi) = @_;
 
     my %found = ( defs => [], packages => {}, uses => {} );
-    my @todo  = ( [ $ppi, 'main', q{} ] );
-    while ( my $frame = pop @todo ) {
-        my ( $node, $pkg, $in_sub ) = @$frame;
-        foreach my $child ( $node->children() ) {
+    Perl::Critic::Distribution->walk(
+        $ppi,
+        sub {
+            my ( $child, $pkg, $in_sub ) = @_;
+
             if ( $child->isa('PPI::Statement::Package') ) {
-                my ($block) = grep { $_->isa('PPI::Structure::Block') } $child->schildren();
                 $package->( \%found, $child->namespace() );
-                push @todo, [ $block, $child->namespace(), $in_sub ] if $block;
-                $pkg = $child->namespace() if !$block;
-                next;
+                return;
             }
 
             my $first = $child->isa('PPI::Statement') ? $child->schild(0) : undef;
@@ -567,21 +542,16 @@ sub walk {
                 $owner //= $pkg;
                 $package->( \%found, $owner )->{subs}{$name} = 1;
                 push @{ $found{defs} }, [ $child, $owner, $name ];
-                push @todo,             [ $child, $pkg,   $name ];
-                next;
+                return;
             }
 
             # A class names its parents outside its subs.
-            push @{ $package->( \%found, $pkg )->{parents} }, parents_named($child) if $child->isa('PPI::Statement') && $in_sub eq q{};
+            push @{ $package->( \%found, $pkg )->{parents} }, parents_named($child) if $child->isa('PPI::Statement') && !defined $in_sub;
 
-            if ( $child->isa('PPI::Node') ) {
-                push @todo, [ $child, $pkg, $in_sub ];
-            }
-            else {
-                $found{uses}{ join "\0", $pkg, $in_sub, $_ } = 1 for names_used($child);
-            }
-        }
-    }
+            $found{uses}{ join "\0", $pkg, $in_sub // q{}, $_ } = 1 for $child->isa('PPI::Node') ? () : names_used($child);
+            return;
+        },
+    );
     return \%found;
 }
 

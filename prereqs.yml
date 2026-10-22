@@ -5,7 +5,7 @@ runtime:
   requires:
     perl: '5.014'
     Perl::Critic: '1.140'
-    Perl::Critic::Distribution: '0.001'
+    Perl::Critic::Distribution: '0.002'
     List::Util: '1.33'
 test:
   requires:

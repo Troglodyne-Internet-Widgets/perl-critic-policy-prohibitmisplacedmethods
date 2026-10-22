@@ -284,6 +284,15 @@ the last part of it when it is qualified, the name of a `\&name`, a string or
 `qw{}` word that spells a name, and each method that an interpolating string
 calls.
 
+# BUGS
+
+Please report any bugs or feature requests on the bugtracker website
+[https://github.com/Troglodyne-Internet-Widgets/perl-critic-policy-prohibitmisplacedmethods/issues](https://github.com/Troglodyne-Internet-Widgets/perl-critic-policy-prohibitmisplacedmethods/issues)
+
+When submitting a bug or request, please include a test-file or a
+patch to an existing test-file that illustrates the bug or desired
+feature.
+
 # AUTHORS
 
 Current Maintainers:

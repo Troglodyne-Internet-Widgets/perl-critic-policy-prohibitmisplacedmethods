@@ -1,5 +1,9 @@
 Revision history for Perl-Critic-Policy-ProhibitMisplacedMethods
 
+{{$NEXT}}
+    - A string that starts with a digit, such as 1Foo, in use parent, use base,
+      extends or @ISA is no longer taken as a parent class.
+
 0.001 2026-10-22 TEODESIAN
     - Initial release.  Reports a sub that only one subclass uses, and a sub
       that two subclasses define where the class above them defines none.

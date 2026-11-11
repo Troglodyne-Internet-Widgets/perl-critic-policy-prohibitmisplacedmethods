@@ -31,7 +31,8 @@ use File::Basename qw{dirname};
 
 use FindBin::libs;
 
-use Perl::Critic ();
+use Perl::Critic  ();
+use PPI::Document ();
 
 use_ok('Perl::Critic::Policy::ProhibitMisplacedMethods');
 
@@ -229,6 +230,24 @@ subtest 'every way to name a parent is read' => sub {
             $files{'lib/Base/One.pm'} = "package Base::One {\n    use parent -norequire, 'Base';\n    sub release { 1 }\n}\npackage Base::Two {\n    use parent -norequire, 'Base';\n    sub release { 2 }\n}\n1;\n";
         }
         is_deeply( found( dist(%files), 'lib/Base/One.pm' )->[0], beside(qw{Base::One::release Base::Two Base}), $how );
+    }
+};
+
+subtest 'only a name that a package can have is a parent' => sub {
+    my %statement_for = (
+        'use parent' => "use parent -norequire, '%s';\n",
+        'use base'   => "use base '%s';\n",
+        'our @ISA'   => "our \@ISA = ('%s');\n",
+        'push @ISA'  => "push \@ISA, '%s';\n",
+        'extends'    => "extends '%s';\n",
+    );
+    my %want = ( '1Foo' => [], 'Foo::Bar' => ['Foo::Bar'], '_Foo' => ['_Foo'], 'Foo::1Bar' => ['Foo::1Bar'] );
+    foreach my $how ( sort keys %statement_for ) {
+        foreach my $name ( sort keys %want ) {
+            my $doc = PPI::Document->new( \sprintf( $statement_for{$how}, $name ) );
+            my ($statement) = grep { $_->isa('PPI::Statement') } $doc->schildren();
+            is_deeply( [ Perl::Critic::Policy::ProhibitMisplacedMethods::parents_named($statement) ], $want{$name}, "$how: $name" );
+        }
     }
 };
 

@@ -583,7 +583,7 @@ sub parents_named {
     }
     return if !$names;
 
-    return grep { m/\A\w+(?:::\w+)*\z/xs } (
+    return grep { m/\A[[:alpha:]_]\w*(?:::\w+)*\z/xs } (
         map( { $_->literal() } @{ $stmt->find('PPI::Token::QuoteLike::Words') || [] } ),
         map( { $_->string() } @{ $stmt->find('PPI::Token::Quote')             || [] } ),
     );

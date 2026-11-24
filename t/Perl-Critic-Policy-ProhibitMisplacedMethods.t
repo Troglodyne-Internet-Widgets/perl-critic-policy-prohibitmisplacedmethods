@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!perl
 
 use 5.014;
 
@@ -67,9 +67,19 @@ sub dist {
     return $root;
 }
 
+# The description of each violation, through a named variable and not $_.
+sub descriptions {
+    my (@violations) = @_;
+    my @described;
+    foreach my $violation (@violations) {
+        push @described, $violation->description();
+    }
+    return \@described;
+}
+
 sub found {
     my ( $root, $file, $critic ) = @_;
-    return [ map { $_->description() } ( $critic // critic() )->critique("$root/$file") ];
+    return descriptions( ( $critic // critic() )->critique("$root/$file") );
 }
 
 sub only_below { return "Sub $_[0] is used only by $_[1], a subclass of $_[2]" }
@@ -253,8 +263,8 @@ subtest 'only a name that a package can have is a parent' => sub {
 
 subtest 'only a file in bin/ or lib/ is checked' => sub {
     my $root = dist( class_file( 'Base', undef, 'sub new { 1 }' ), 't/lib/Base/One.pm' => "package Base::One;\nuse parent -norequire, 'Base';\nsub release { 1 }\n1;\n" );
-    is_deeply( found( $root, 't/lib/Base/One.pm' ),                                                          [], 'a test is not' );
-    is_deeply( [ map { $_->description() } critic()->critique( \"package Base;\nsub helper { 1 }\n1;\n" ) ], [], 'nor source with no file' );
+    is_deeply( found( $root, 't/lib/Base/One.pm' ),                                            [], 'a test is not' );
+    is_deeply( descriptions( critic()->critique( \"package Base;\nsub helper { 1 }\n1;\n" ) ), [], 'nor source with no file' );
 };
 
 Test::NoWarnings::had_no_warnings();

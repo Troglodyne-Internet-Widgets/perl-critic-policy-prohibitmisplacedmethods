@@ -9,6 +9,9 @@ use warnings FATAL => 'all';
 
 use re '/aa';
 
+# A read of $index->{a}{b} does not create $index->{a}.
+no autovivification;
+
 use Readonly;
 
 use List::Util   ();
@@ -335,7 +338,10 @@ sub subs_in {
 
         my $dist = Perl::Critic::Distribution->for_file( $file, cache => $self->{_cache}, cache_dir => $self->{_cache_dir} );
         if ($dist) {
-            my %by_elem = map { Scalar::Util::refaddr( $_->[0] ) => [ @$_[ 1, 2 ] ] } @{ walk( $doc->ppi_document() )->{defs} };
+            my %by_elem;
+            foreach my $def ( @{ walk( $doc->ppi_document() )->{defs} } ) {
+                $by_elem{ Scalar::Util::refaddr( $def->[0] ) } = [ @{$def}[ 1, 2 ] ];
+            }
             $subs = { dist => $dist, by_elem => \%by_elem };
         }
     }
@@ -583,10 +589,14 @@ sub parents_named {
     }
     return if !$names;
 
-    return grep { m/\A[[:alpha:]_]\w*(?:::\w+)*\z/xs } (
-        map( { $_->literal() } @{ $stmt->find('PPI::Token::QuoteLike::Words') || [] } ),
-        map( { $_->string() } @{ $stmt->find('PPI::Token::Quote')             || [] } ),
-    );
+    my @candidates;
+    foreach my $words ( @{ $stmt->find('PPI::Token::QuoteLike::Words') || [] } ) {
+        push @candidates, $words->literal();
+    }
+    foreach my $quote ( @{ $stmt->find('PPI::Token::Quote') || [] } ) {
+        push @candidates, $quote->string();
+    }
+    return grep { m/\A[[:alpha:]_]\w*(?:::\w+)*\z/xs } @candidates;
 }
 
 =head3 names_used
